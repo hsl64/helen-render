@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Homework 1 INFO 4310</title>
+    <script src="https://d3js.org/d3.v6.min.js"></script>
+    <script src="https://d3js.org/topojson.v3.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        h2 { 
+            text-align: center; 
+            margin-top: 50px; 
+            max-width: 900px;
+        }
+        p {
+            margin: 50px;
+            max-width: 900px;
+        }
+        .city-boundary { 
+            fill: none; 
+            stroke: lightgrey; 
+            stroke-width: 1; 
+        }
+        .legend { 
+            font-size: 14px; 
+            display: block; 
+        }
+    </style>
+</head>
+<body>
+    <h2>San Francisco Tree Species in Urban Planning</h2>
+    <p>Grouping urban trees based on their primary functions 
+        (ornamental value, shade provision, evergreen privacy, and resilience) 
+        helps inform strategic urban forestry decisions in San Francisco. 
+        By categorizing tree species into their functions, 
+        city planners can make informed decisions about tree placement, maintenance, and species selection.
+        <br><br>
+        <u>Ornamental/Decorative Trees:</u> visual appeal, seasonal beauty<br>
+        <u>Urban/Shade Trees:</u> reduce heat, improve air quality<br>
+        <u>Evergreen/Privacy Trees:</u> natural barriers, reduce noise pollution, maintain greenery<br>
+        <u>Invasive Trees:</u> maintain biodiversity, prevent ecological imbalances
+    </p>
+    <svg id="map" width="900" height="800"></svg>
+
+    <script>
+        let svgMap = d3.select("#map");
+
+        // define categories
+        const categories = ["Ornamental/Decorative", "Urban/Shade", "Evergreen/Privacy", "Invasive"];
+        const categoryMapping = {
+            "Ornamental/Decorative": ["Prunus", "Magnolia", "Lagerstroemia", "Callistemon", "Malus", "Corymbia", "Arbutus", "Eriobotrya"],
+            "Urban/Shade": ["Platanus", "Quercus", "Acer", "Fraxinus", "Ginkgo", "Pyrus", "Ulmus", "Lophostemon", "Tristaniopsis"],
+            "Evergreen/Privacy": ["Pinus", "Cupressus", "Sequoia", "Pittosporum", "Ligustrum", "Juniperus"],
+            "Invasive": ["Eucalyptus", "Acacia", "Schinus", "Ficus", "Melaleuca", "Maytenus", "Myoporum"]
+        };
+
+        // define colors
+        const colorScale = d3.scaleOrdinal()
+            .domain(categories)
+            .range(["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"]);
+
+        let projection = d3.geoMercator()
+            .center([-122.4194, 37.7749])
+            .scale(240000)
+            .translate([500, 350]);
+
+        // load json
+        d3.json("SF-Neighborhoods.geo.json").then(function(topoData) {
+            const objectKey = Object.keys(topoData.objects)[0];
+            const geoData = topojson.feature(topoData, topoData.objects[objectKey]);
+
+            let path = d3.geoPath().projection(projection);
+
+            // draw city boundaries
+            svgMap.append("g")
+                .selectAll("path")
+                .data(geoData.features)
+                .enter()
+                .append("path")
+                .attr("d", path)
+                .attr("class", "city-boundary");
+
+            // load csv
+            d3.csv("Street_Tree_List-2022-01-30_FILTERED.csv").then(function(data) {
+
+                // categorize trees
+                function categorizeSpecies(species) {
+                    for (const [category, keywords] of Object.entries(categoryMapping)) {
+                        if (keywords.some(keyword => species.includes(keyword))) {
+                            return category;
+                        }
+                    }
+                    return null;
+                }
+
+                data.forEach(d => d.SpeciesCategory = categorizeSpecies(d.qSpecies));
+                data = data.filter(d => d.SpeciesCategory !== null);
+
+                // draw trees as circles
+                svgMap.selectAll("circle")
+                    .data(data)
+                    .enter()
+                    .append("circle")
+                    .attr("cx", d => projection([+d.Longitude, +d.Latitude])[0])
+                    .attr("cy", d => projection([+d.Longitude, +d.Latitude])[1])
+                    .attr("r", 2)
+                    .attr("fill", d => colorScale(d.SpeciesCategory))
+                    .attr("opacity", 0.5);
+
+                // add legend
+                const legend = svgMap.append("g")
+                    .attr("class", "legend")
+                    .attr("transform", "translate(50, 50)");
+
+                categories.forEach((category, i) => {
+                    legend.append("circle")
+                        .attr("cx", 10)
+                        .attr("cy", i * 20 + 13)
+                        .attr("r", 5)
+                        .attr("fill", colorScale(category))
+                        .attr("opacity", 0.7);
+
+                    legend.append("text")
+                        .attr("x", 20)
+                        .attr("y", i * 20 + 15)
+                        .text(category)
+                        .attr("alignment-baseline", "middle")
+                        .attr("fill", "black");
+                });
+
+            }).catch(function(error) {
+                console.error("Error loading or processing CSV data:", error);
+            });
+
+        }).catch(function(error) {
+            console.error("Error loading or processing GeoJSON data:", error);
+        });
+
+    </script>
+</body>
+</html>
