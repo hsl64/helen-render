@@ -3,142 +3,438 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Homework 1 INFO 4310</title>
-    <script src="https://d3js.org/d3.v6.min.js"></script>
-    <script src="https://d3js.org/topojson.v3.min.js"></script>
+    <title>Homework 2</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
+            background-color: white;
+            margin: 50;
+            padding: 20px;
         }
-        h2 { 
-            text-align: center; 
-            margin-top: 50px; 
-            max-width: 900px;
+        .disclaimer {
+            background-color: #f0f0f0;
+            padding: 3px;
+            padding-left: 20px;
+            border-radius: 4px;
+            color: darkslategrey;
         }
-        p {
-            margin: 50px;
-            max-width: 900px;
+        .chart-container {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
         }
-        .city-boundary { 
-            fill: none; 
-            stroke: lightgrey; 
-            stroke-width: 1; 
+        .chart {
+            width: 45%;
+            background-color: #f0f0f0;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 4px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
-        .legend { 
-            font-size: 14px; 
-            display: block; 
+        .group-by-btn {
+            margin-right: 10px;
+            margin-bottom: 5px;
+            padding: 8px 16px;
+            border: 1px solid black;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s, color 0.3s;
+            background-color: white;
+            color: black;
+        }
+        .group-by-btn:hover {
+            background-color: lightgray;
+        }
+        .group-by-btn.active {
+            background-color: darkslategrey;
+            color: white;
+            border-color: black;
+        }
+        .legend {
+            display: flex;
+            justify-content: center;
+            margin-top: 10px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-right: 20px;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            margin-right: 5px;
+        }
+        #check-all {
+            margin-bottom: 10px;
+            padding: 8px 16px;
+            stroke-width: 2px;
+            border: 1px solid black;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            background-color: white;
+        }
+        #check-all:hover {
+            background-color: lightgray;
+        }
+        .category-btn {
+            margin-right: 10px;
+            margin-bottom: 5px;
+            padding: 8px 16px;
+            border: 1px solid black;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s, color 0.3s;
+            background-color: white;
+            color: black;
+        }
+        .category-btn:hover {
+            background-color: lightgray;
+        }
+        .category-btn.active {
+            background-color: darkslategrey;
+            color: white;
+            border-color: black;
         }
     </style>
 </head>
 <body>
-    <h2>San Francisco Tree Species in Urban Planning</h2>
-    <p>Grouping urban trees based on their primary functions 
-        (ornamental value, shade provision, evergreen privacy, and resilience) 
-        helps inform strategic urban forestry decisions in San Francisco. 
-        By categorizing tree species into their functions, 
-        city planners can make informed decisions about tree placement, maintenance, and species selection.
-        <br><br>
-        <u>Ornamental/Decorative Trees:</u> visual appeal, seasonal beauty<br>
-        <u>Urban/Shade Trees:</u> reduce heat, improve air quality<br>
-        <u>Evergreen/Privacy Trees:</u> natural barriers, reduce noise pollution, maintain greenery<br>
-        <u>Invasive Trees:</u> maintain biodiversity, prevent ecological imbalances
+    <h1>Predicting Recidivism: Exploring the Impact of LSI-R Categories</h1>
+    <p>The Level of Service Inventory-Revised (LSI-R) is a risk assessment tool used in the criminal justice system 
+        to evaluate the likelihood of an individual re-offending (recidivate). This visualization investigates how specific 
+        LSI-R categories may play a greater or lesser role in predicting recidivism for specific demographics. 
+        The interactive charts compare actual recidivism rates against rates predicted based on selected LSI-R categories. 
+        The goal is to gain insights into how certain LSI-R categories might be more strongly associated with re-offense (recidivism) 
+        and how these relationships vary across race, gender, and age.
     </p>
-    <svg id="map" width="900" height="800"></svg>
+
+    <div class="disclaimer">
+        <p><i>Note: These visualizations are intended for educational and exploratory purposes only. 
+            Due to project constraints, several simplifying assumptions were made:
+            <ul>
+                <li>Simplified Risk Calculation: The predicted risk may not accurately reflect the complex weighting used in the official LSI-R assessment.</li>
+                <li>Logistic Regression: The curve is a simplified representation and is not based on a fitted statistical model. 
+                Therefore, it does not provide information about statistical significance.</li>
+            </ul>
+            </i>
+        </p>
+    </div>
+
+    <div id="controls">
+        <h2>Select LSI-R Categories:</h2>
+        <button id="check-all">Select/Deselect All</button>
+        <div id="category-checkboxes"></div>
+        <h2>Group By:</h2>
+        <div id="group-by-buttons">
+            <button class="group-by-btn" data-value="race">Race</button>
+            <button class="group-by-btn" data-value="sex">Gender</button>
+            <button class="group-by-btn" data-value="age">Age</button>
+        </div>
+    </div>
+
+    </div>
+    <div class="chart-container">
+        <div id="bar-chart" class="chart"></div>
+        <div id="logistic-chart" class="chart"></div>
+    </div>
 
     <script>
-        let svgMap = d3.select("#map");
+        // load data and sort columns into categories
+        d3.csv("LSI-R-Data-AICJ.csv").then(data => {
+            const categories = {
+                "Criminal History": ["CH1", "CH2", "CH3", "CH4", "CH5", "CH6", "CH7", "CH8", "CH9", "CH10"],
+                "Employment/Education": ["E11", "E12", "E13", "E14"],
+                "Financial": ["FIN21", "FIN22"],
+                "Family/Marital": ["FM23", "FM24", "FM25", "FM26"],
+                "Neighborhood": ["AC27", "AC28", "AC29"],
+                "Recreation": ["RE30", "RE31"],
+                "Friends": ["COM32", "COM33", "COM34", "COM35", "COM36"],
+                "Alcohol/Drug": ["AD37", "AD38", "AD39", "AD40", "AD41", "AD42", "AD43", "AD44", "AD45"],
+                "Emotional/Personal": ["EM46", "EM47", "EM48", "EM49", "EM50"],
+                "Attitude/Orientation": ["AT51", "AT52", "AT53", "AT54"]
+            };
 
-        // define categories
-        const categories = ["Ornamental/Decorative", "Urban/Shade", "Evergreen/Privacy", "Invasive"];
-        const categoryMapping = {
-            "Ornamental/Decorative": ["Prunus", "Magnolia", "Lagerstroemia", "Callistemon", "Malus", "Corymbia", "Arbutus", "Eriobotrya"],
-            "Urban/Shade": ["Platanus", "Quercus", "Acer", "Fraxinus", "Ginkgo", "Pyrus", "Ulmus", "Lophostemon", "Tristaniopsis"],
-            "Evergreen/Privacy": ["Pinus", "Cupressus", "Sequoia", "Pittosporum", "Ligustrum", "Juniperus"],
-            "Invasive": ["Eucalyptus", "Acacia", "Schinus", "Ficus", "Melaleuca", "Maytenus", "Myoporum"]
-        };
-
-        // define colors
-        const colorScale = d3.scaleOrdinal()
-            .domain(categories)
-            .range(["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"]);
-
-        let projection = d3.geoMercator()
-            .center([-122.4194, 37.7749])
-            .scale(240000)
-            .translate([500, 350]);
-
-        // load json
-        d3.json("SF-Neighborhoods.geo.json").then(function(topoData) {
-            const objectKey = Object.keys(topoData.objects)[0];
-            const geoData = topojson.feature(topoData, topoData.objects[objectKey]);
-
-            let path = d3.geoPath().projection(projection);
-
-            // draw city boundaries
-            svgMap.append("g")
-                .selectAll("path")
-                .data(geoData.features)
-                .enter()
-                .append("path")
-                .attr("d", path)
-                .attr("class", "city-boundary");
-
-            // load csv
-            d3.csv("Street_Tree_List-2022-01-30_FILTERED.csv").then(function(data) {
-
-                // categorize trees
-                function categorizeSpecies(species) {
-                    for (const [category, keywords] of Object.entries(categoryMapping)) {
-                        if (keywords.some(keyword => species.includes(keyword))) {
-                            return category;
-                        }
-                    }
-                    return null;
-                }
-
-                data.forEach(d => d.SpeciesCategory = categorizeSpecies(d.qSpecies));
-                data = data.filter(d => d.SpeciesCategory !== null);
-
-                // draw trees as circles
-                svgMap.selectAll("circle")
-                    .data(data)
-                    .enter()
-                    .append("circle")
-                    .attr("cx", d => projection([+d.Longitude, +d.Latitude])[0])
-                    .attr("cy", d => projection([+d.Longitude, +d.Latitude])[1])
-                    .attr("r", 2)
-                    .attr("fill", d => colorScale(d.SpeciesCategory))
-                    .attr("opacity", 0.5);
-
-                // add legend
-                const legend = svgMap.append("g")
-                    .attr("class", "legend")
-                    .attr("transform", "translate(50, 50)");
-
-                categories.forEach((category, i) => {
-                    legend.append("circle")
-                        .attr("cx", 10)
-                        .attr("cy", i * 20 + 13)
-                        .attr("r", 5)
-                        .attr("fill", colorScale(category))
-                        .attr("opacity", 0.7);
-
-                    legend.append("text")
-                        .attr("x", 20)
-                        .attr("y", i * 20 + 15)
-                        .text(category)
-                        .attr("alignment-baseline", "middle")
-                        .attr("fill", "black");
-                });
-
-            }).catch(function(error) {
-                console.error("Error loading or processing CSV data:", error);
+            // create buttons for categories
+            const buttonContainer = d3.select("#category-checkboxes");
+            Object.keys(categories).forEach(category => {
+                const button = buttonContainer.append("button")
+                    .attr("class", "category-btn")
+                    .attr("data-value", category)
+                    .text(category)
+                    .on("click", function() {
+                        const isActive = d3.select(this).classed("active");
+                        d3.select(this).classed("active", !isActive);
+                        updateVisualization();
+                    });
             });
 
-        }).catch(function(error) {
-            console.error("Error loading or processing GeoJSON data:", error);
-        });
+            // select/deselect all button
+            d3.select("#check-all").on("click", function() {
+                const buttons = d3.selectAll("#category-checkboxes .category-btn");
+                const allActive = buttons.filter(".active").size() === buttons.size();
+                buttons.classed("active", !allActive);
+                updateVisualization();
+            });
 
+            // group by buttons
+            d3.selectAll(".group-by-btn").on("click", function() {
+                d3.selectAll(".group-by-btn").classed("active", false);
+                d3.select(this).classed("active", true);
+                updateVisualization();
+            });
+
+            // group ages
+            function getAgeGroup(age) {
+                if (age < 20) return "Under 20";
+                if (age < 30) return "20-29";
+                if (age < 40) return "30-39";
+                if (age < 50) return "40-49";
+                if (age < 60) return "50-59";
+                return "60+";
+            }
+
+            // add age groups and replace race/gender codes
+            data.forEach(d => {
+                d.ageGroup = getAgeGroup(+d.age);
+                d.race = d.race === "1" ? "Race 1" : d.race === "2" ? "Race 2" : "Race 3";
+                d.sex = d.sex === "1" ? "Male" : "Female";
+            });
+
+            // initialize charts
+            initializeCharts();
+
+            function initializeCharts() {
+                updateBarChart([]); 
+                updateLogisticChart([], []);
+            }
+
+            // set race to default
+            function updateVisualization() {
+                const selectedCategories = d3.selectAll("#category-checkboxes .category-btn.active").nodes().map(node => node.dataset.value);
+                let groupBy = "race";
+                const activeBtn = d3.select(".group-by-btn.active");
+                if (!activeBtn.empty()) {
+                    groupBy = activeBtn.attr("data-value");
+                }
+
+                // get actual and predicted recidivism rates
+                const groupedData = d3.group(data, d => groupBy === 'age' ? d.ageGroup : d[groupBy]);
+                const results = Array.from(groupedData, ([key, group]) => {
+                    const actualRate = d3.mean(group, d => +d.Recidivism);
+                    const predictedRate = calculatePredictedRate(group, selectedCategories);
+                    return { group: key, actualRate, predictedRate };
+                });
+
+                // update charts
+                updateBarChart(results);
+                updateLogisticChart(data, selectedCategories);
+            }
+
+            // calculate predicted recidivism rates
+            function calculatePredictedRate(group, selectedCategories) {
+                const selectedQuestions = selectedCategories.flatMap(category => categories[category]);
+                const scores = group.map(d => {
+                    return d3.sum(selectedQuestions, q => +d[q]) / selectedQuestions.length;
+                });
+                return d3.mean(scores);
+            }
+
+            // create bar chart
+            function updateBarChart(data) {
+                const margin = {top: 20, right: 20, bottom: 70, left: 60};
+                const width = 400 - margin.left - margin.right;
+                const height = 300 - margin.top - margin.bottom;
+
+                // the usual
+                d3.select("#bar-chart").selectAll("*").remove();
+                const svg = d3.select("#bar-chart")
+                    .append("svg")
+                    .attr("width", width + margin.left + margin.right)
+                    .attr("height", height + margin.top + margin.bottom)
+                    .append("g")
+                    .attr("transform", `translate(${margin.left},${margin.top + 20})`);
+                const x = d3.scaleBand()
+                    .range([0, width])
+                    .padding(0.1);
+                const y = d3.scaleLinear()
+                    .range([height, 0]);
+
+                // check data length
+                if (data && data.length > 0) {
+                    x.domain(data.map(d => d.group));
+                    y.domain([0, d3.max(data, d => Math.max(d.actualRate, d.predictedRate)) || 1]);
+
+                    // add bars
+                    svg.selectAll(".bar-actual")
+                        .data(data)
+                        .enter().append("rect")
+                        .attr("class", "bar-actual")
+                        .attr("x", d => x(d.group))
+                        .attr("width", x.bandwidth() / 2)
+                        .attr("y", d => y(d.actualRate))
+                        .attr("height", d => height - y(d.actualRate))
+                        .attr("fill", "#6acf65");
+
+                    svg.selectAll(".bar-predicted")
+                        .data(data)
+                        .enter().append("rect")
+                        .attr("class", "bar-predicted")
+                        .attr("x", d => x(d.group) + x.bandwidth() / 2)
+                        .attr("width", x.bandwidth() / 2)
+                        .attr("y", d => y(d.predictedRate))
+                        .attr("height", d => height - y(d.predictedRate))
+                        .attr("fill", "#1976d2");
+
+                    // add axes
+                    svg.append("g")
+                        .attr("transform", `translate(0,${height})`)
+                        .call(d3.axisBottom(x))
+                        .selectAll("text")
+                        .style("text-anchor", "middle");
+
+                    svg.append("g")
+                        .call(d3.axisLeft(y));
+
+                    svg.append("text")
+                        .attr("x", width / 2)
+                        .attr("y", -20)
+                        .attr("text-anchor", "middle")
+                        .text("Actual vs Predicted Recidivism Rates");
+
+                    svg.append("text")
+                        .attr("transform", "rotate(-90)")
+                        .attr("y", 0 - margin.left)
+                        .attr("x", 0 - (height / 2))
+                        .attr("dy", "1em")
+                        .style("text-anchor", "middle")
+                        .text("Recidivism Rate");
+
+                    // add legend
+                    const legend = svg.append("g")
+                        .attr("class", "legend")
+                        .attr("transform", `translate(${width / 2 - 80}, ${height + 30})`); 
+
+                    legend.append("rect")
+                        .attr("x", -10)
+                        .attr("y", 4)
+                        .attr("width", 10)
+                        .attr("height", 10)
+                        .attr("fill", "#6acf65");
+
+                    legend.append("text")
+                        .attr("x", 5)
+                        .attr("y", 10)
+                        .text("Actual Rate")
+                        .style("font-size", "12px")
+                        .attr("alignment-baseline", "middle");
+
+                    legend.append("rect")
+                        .attr("x", 80) 
+                        .attr("y", 4)
+                        .attr("width", 10)
+                        .attr("height", 10)
+                        .attr("fill", "#1976d2");
+
+                    legend.append("text")
+                        .attr("x", 95)
+                        .attr("y", 10)
+                        .text("Predicted Rate")
+                        .style("font-size", "12px")
+                        .attr("alignment-baseline", "middle");
+
+                } else {
+                    // add message when there is no data
+                    svg.append("text")
+                        .attr("x", width / 2)
+                        .attr("y", height / 2)
+                        .attr("text-anchor", "middle")
+                        .text("No data to display");
+                }
+            }
+
+            // create log chart
+            function updateLogisticChart(data, selectedCategories) {
+                const margin = {top: 20, right: 20, bottom: 50, left: 50};
+                const width = 400 - margin.left - margin.right;
+                const height = 300 - margin.top - margin.bottom;
+
+                // the usual
+                d3.select("#logistic-chart").selectAll("*").remove();
+                const svg = d3.select("#logistic-chart")
+                    .append("svg")
+                    .attr("width", width + margin.left + margin.right)
+                    .attr("height", height + margin.top + margin.bottom)
+                    .append("g")
+                    .attr("transform", `translate(${margin.left},${margin.top})`);
+
+                // add conditional when categories are selected
+                if (selectedCategories.length > 0) {
+                    const x = d3.scaleLinear()
+                        .range([0, width]);
+                    const y = d3.scaleLinear()
+                        .range([height, 0]);
+
+                    const selectedQuestions = selectedCategories.flatMap(category => categories[category]);
+                    const scores = data.map(d => {
+                        return d3.sum(selectedQuestions, q => +d[q]) / selectedQuestions.length;
+                    });
+
+                    x.domain([0, d3.max(scores) || 1]);
+                    y.domain([0, 1]);
+
+                    // create logistic curve (not completely accurate)
+                    const curve = d3.line()
+                        .x(d => x(d))
+                        .y(d => y(1 / (1 + Math.exp(-d))))
+                        .curve(d3.curveBasis);
+
+                    svg.append("path")
+                        .datum(d3.range(0, d3.max(scores) || 1, 0.1))
+                        .attr("fill", "none")
+                        .attr("stroke", "#d21f3c")
+                        .attr("stroke-width", 1.5)
+                        .attr("d", curve);
+
+                    // add axes
+                    svg.append("g")
+                        .attr("transform", `translate(0,${height})`)
+                        .call(d3.axisBottom(x));
+
+                    svg.append("g")
+                        .call(d3.axisLeft(y));
+
+                    svg.append("text")
+                        .attr("x", width / 2)
+                        .attr("y", 0)
+                        .attr("text-anchor", "middle")
+                        .text("Logistic Regression Curve");
+
+                    svg.append("text")
+                        .attr("transform", `translate(${width/2}, ${height + margin.top + 20})`)
+                        .style("text-anchor", "middle")
+                        .text("LSI-R Score");
+
+                    svg.append("text")
+                        .attr("transform", "rotate(-90)")
+                        .attr("y", 0 - margin.left)
+                        .attr("x", 0 - (height / 2))
+                        .attr("dy", "1em")
+                        .style("text-anchor", "middle")
+                        .text("Probability of Recidivism");
+                } else {
+                    // add message when nothing selected
+                    svg.append("text")
+                        .attr("x", width / 2)
+                        .attr("y", 125)
+                        .attr("text-anchor", "middle")
+                        .text("No categories selected");
+                }
+            }
+        });
     </script>
-</body>
+</body
 </html>
