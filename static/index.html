@@ -200,7 +200,7 @@
             // add age groups and replace race/gender codes
             data.forEach(d => {
                 d.ageGroup = getAgeGroup(+d.age);
-                d.race = d.race === "1" ? "Race 1" : d.race === "2" ? "Race 2" : "Race 3";
+                d.race = d.race === "1" ? "White" : d.race === "2" ? "Black" : "Hispanic";
                 d.sex = d.sex === "1" ? "Male" : "Female";
             });
 
